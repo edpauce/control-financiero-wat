@@ -1,0 +1,15 @@
+# Capa de datos (nunca se versiona): el archivo financiero vive fuera del repo
+/0[1-8]. */
+
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+.DS_Store

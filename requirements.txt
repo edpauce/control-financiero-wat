@@ -1,0 +1,3 @@
+openpyxl>=3.1     # leer/escribir los Excel de trabajo (.xlsx)
+xlrd>=2.0         # leer los .xls antiguos (BIFF) del Banco de la Nación
+pytest>=8.0       # python -m pytest tests/ -q
