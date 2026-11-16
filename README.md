@@ -76,4 +76,4 @@ una decisión; la capa de datos (carpetas `01.`–`08.`) tampoco se versiona.
 
 Edson Palomino — [github.com/edpauce](https://github.com/edpauce)
 
-Código publicado como muestra de trabajo. Todos los derechos reservados.
+Licencia [MIT](LICENSE).
