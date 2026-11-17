@@ -1,61 +1,61 @@
-# Control financiero con agentes — núcleo determinista
+# Agent-driven financial control — deterministic core
 
-Extracto de un sistema privado que lleva el control financiero mensual de un grupo de dos
-empresas peruanas de servicios: conciliación bancaria, detracciones (SPOT), cruce tributario
-con SUNAT y cuentas por cobrar. Un agente de IA orquesta el cierre; **el código de este repo es
-la parte que no se le deja al modelo**.
+An extract from a private system that runs the monthly financial close of a group of two
+Peruvian service companies: bank reconciliation, tax withholdings (SPOT), tax cross-checks
+against SUNAT (Peru's tax authority) and accounts receivable. An AI agent orchestrates the
+close; **the code in this repo is the part that is never left to the model**.
 
-> Todos los nombres, RUC, cuentas e importes son **ficticios**. El sistema completo y sus datos
-> son privados; aquí está el núcleo genérico, con sus tests.
+> All names, tax IDs (RUC), accounts and amounts are **fictitious**. The full system and its
+> data are private; this is the generic core, with its tests.
 
-## La idea
+## The idea
 
-Si cada paso de un proceso es 90% exacto, tras cinco pasos quedas en 59%. Por eso el trabajo se
-reparte en tres capas:
+If every step of a process is 90% accurate, after five steps you are at 59%. That is why the
+work is split into three layers:
 
 ```mermaid
 flowchart LR
-    W[Workflows<br/>SOPs en markdown] --> A[Agente<br/>decide y orquesta]
-    A --> T[Tools<br/>Python determinista]
-    T --> G{Gate de escritura<br/>lib/policy.py}
-    G -->|permitir| M[(Maestros<br/>Excel)]
-    G -->|denegar / pedir aprobación| A
-    T -.lee.-> F[(Fuentes crudas<br/>banco · SUNAT · facturación)]
+    W[Workflows<br/>SOPs in markdown] --> A[Agent<br/>decides and orchestrates]
+    A --> T[Tools<br/>deterministic Python]
+    T --> G{Write gate<br/>lib/policy.py}
+    G -->|allow| M[(Master files<br/>Excel)]
+    G -->|deny / ask for approval| A
+    T -.reads.-> F[(Raw sources<br/>bank · SUNAT · invoicing)]
 ```
 
-- **Workflows**: qué hacer y cuándo, en lenguaje plano.
-- **Agente**: lee el workflow, elige el tool, maneja fallos y pregunta cuando falta información.
-- **Tools**: cálculo, parseo y escritura. Deterministas y testeados.
+- **Workflows**: what to do and when, in plain language.
+- **Agent**: reads the workflow, picks the tool, handles failures and asks when information is missing.
+- **Tools**: calculation, parsing and writing. Deterministic and tested.
 
-Las reglas de seguridad no viven en el prompt. Viven en código que el agente no puede saltarse.
+Safety rules don't live in the prompt. They live in code the agent cannot bypass.
 
-## Qué hay aquí
+## What's here
 
-| Pieza | Archivo | Qué resuelve |
+| Piece | File | What it solves |
 |---|---|---|
-| Gate de escritura | `tools/lib/policy.py` | Siete checks deterministas antes de tocar un maestro: entidad, capacidad ↔ archivo, periodo abierto, respaldo previo, umbral de monto, evidencia citada y simulación por defecto. Todo intento queda en un log append-only. |
-| Sello de integridad | `tools/lib/sellos.py`, `tools/sellar_mes.py` | Huella sha256 de los números del banco de cada mes cerrado. La clasificación puede cambiar; los números no, sin que se note. |
-| Compuerta de ingesta | `tools/validar_ingesta.py` | Valida el contenido de cada fuente antes de calcular nada: periodo real, cobertura hasta el corte, formato, identidad de la empresa. |
-| Traspasos internos | `tools/lib/operaciones.py`, `tools/cruzar_operaciones.py` | Une las dos patas de un traspaso por el número de operación del banco. Nunca suma monedas distintas. |
-| Detracciones (SPOT) | `tools/detalle_detracciones.py`, `tools/integrar_detracciones.py`, `tools/lib/constancias.py` | Factura por factura: quién debe depositar el 12%, si ya entró y con qué constancia. Los casos ambiguos se proponen, nunca se cierran solos. |
-| Tributario | `tools/lib/sire.py`, `tools/lib/sire_txt.py`, `tools/ingerir_sire_txt.py`, `tools/incorporar_rvie.py`, `tools/cruzar_tributos.py` | Lee los libros oficiales de SUNAT (RVIE/RCE) y los cruza contra los maestros y el banco. |
-| Comprobantes | `tools/lib/comprobantes.py` | Parser de XML UBL 2.1 y de recibos por honorarios en PDF. |
-| Identidad de pagadores | `tools/lib/identidad.py` | Decide si una glosa bancaria truncada nombra a un cliente, derivando de la cartera qué palabras identifican y cuáles son genéricas. |
-| Extractos | `tools/scrape/bcp_empresas.py`, `tools/scrape/banco_nacion.py` | Parsers de los exports de los bancos (csv, txt con pipe, xlsx, xls BIFF). |
-| Soporte | `tools/lib/cierre.py`, `sources.py`, `formato.py`, `env.py`, `empresas.py`, `clientes.py` | Config por mes, resolución de rutas, formato, datos maestros. |
+| Write gate | `tools/lib/policy.py` | Seven deterministic checks before touching a master file: entity, capability ↔ file, open period, prior backup, amount threshold, cited evidence and dry-run by default. Every attempt is recorded in an append-only log. |
+| Integrity seal | `tools/lib/sellos.py`, `tools/sellar_mes.py` | A sha256 fingerprint of each closed month's bank figures. The classification may change; the numbers cannot change unnoticed. |
+| Intake gate | `tools/validar_ingesta.py` | Validates the content of every source before calculating anything: actual period, coverage up to the cut-off date, format, company identity. |
+| Internal transfers | `tools/lib/operaciones.py`, `tools/cruzar_operaciones.py` | Joins both legs of a transfer by the bank's operation number. Never adds up different currencies. |
+| Withholdings (SPOT) | `tools/detalle_detracciones.py`, `tools/integrar_detracciones.py`, `tools/lib/constancias.py` | Invoice by invoice: who must deposit the 12%, whether it has arrived and with which receipt. Ambiguous cases are proposed, never closed automatically. |
+| Tax | `tools/lib/sire.py`, `tools/lib/sire_txt.py`, `tools/ingerir_sire_txt.py`, `tools/incorporar_rvie.py`, `tools/cruzar_tributos.py` | Reads SUNAT's official sales and purchase ledgers (RVIE/RCE) and cross-checks them against the master files and the bank. |
+| Receipts | `tools/lib/comprobantes.py` | Parser for UBL 2.1 XML invoices and for professional-fee receipts in PDF. |
+| Payer identity | `tools/lib/identidad.py` | Decides whether a truncated bank memo names a client, deriving from the portfolio which words identify a client and which are generic. |
+| Statements | `tools/scrape/bcp_empresas.py`, `tools/scrape/banco_nacion.py` | Parsers for the banks' exports (csv, pipe-delimited txt, xlsx, BIFF xls). |
+| Support | `tools/lib/cierre.py`, `sources.py`, `formato.py`, `env.py`, `empresas.py`, `clientes.py` | Monthly config, path resolution, formatting, master data. |
 
-## Decisiones de diseño
+## Design decisions
 
-- **Denegar por defecto.** Un archivo que el mapa de capacidades no cubre no se escribe.
-- **La frontera es el archivo, no la identidad declarada.** Nada obliga a un modelo a decir la
-  verdad sobre quién es; sí se puede saber qué archivo está a punto de escribir.
-- **Sin `--aplicar` no se escribe.** Toda corrida es una simulación hasta que se pida lo contrario.
-- **Nunca cerrar por adivinar.** Un cruce por importe con dos candidatos se marca ambiguo y lo
-  decide una persona. Una nota de crédito sin documento de destino no se aplica por monto.
-- **Lo descartado se devuelve.** Un descarte invisible es un hueco que nadie audita.
-- **Los tests nombran el caso que los motivó**, para que nadie los borre por redundantes.
+- **Deny by default.** A file not covered by the capability map is not written.
+- **The boundary is the file, not the declared identity.** Nothing forces a model to tell the
+  truth about who it is; you can, however, know which file it is about to write.
+- **No `--aplicar`, no write.** Every run is a simulation unless told otherwise.
+- **Never close on a guess.** An amount match with two candidates is marked ambiguous and a
+  person decides. A credit note without a target document is not applied by amount.
+- **What is discarded is returned.** An invisible discard is a gap nobody audits.
+- **Tests name the case that motivated them**, so nobody deletes them as redundant.
 
-## Correr los tests
+## Running the tests
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -63,17 +63,23 @@ pip install -r requirements.txt
 python -m pytest tests/ -q
 ```
 
-188 tests, todos con datos sintéticos en directorios temporales.
+188 tests, all with synthetic data in temporary directories.
 
-## Qué no incluye
+## What's not included
 
-El sistema del que sale este extracto tiene más piezas: el orquestador del cierre, la
-conciliación completa, cobranzas, flujo de caja, los sub-agentes y sus workflows. No están
-aquí porque están atados a datos reales. Algunos docstrings mencionan esos módulos para explicar
-una decisión; la capa de datos (carpetas `01.`–`08.`) tampoco se versiona.
+The system this extract comes from has more pieces: the close orchestrator, the full
+reconciliation, collections, cash flow, the sub-agents and their workflows. They are not here
+because they are tied to real data. Some docstrings mention those modules to explain a
+decision; the data layer (folders `01.`–`08.`) is not versioned either.
 
-## Autor
+Code identifiers and docstrings are in Spanish, as in the original system.
+
+## Author
 
 Edson Palomino — [github.com/edpauce](https://github.com/edpauce)
 
-Licencia [MIT](LICENSE).
+[MIT](LICENSE) license.
+
+---
+
+*Versión en español: [README.es.md](README.es.md)*
